@@ -62,7 +62,6 @@ contract Multisig {
     /// @param _transferId The ID of the transfer that has already been executed
     error TransferAlreadyExecuted(uint256 _transferId);
     /// @notice Reverts with an error if the signer has already approved the transfer
-    /// @param _transferId The ID of the transfer that has already been approved by the signer
     error AlreadyApprovedBySigner();
     /// @notice Reverts with an error if the transfer ID is invalid
     error InvalidTransferId();
