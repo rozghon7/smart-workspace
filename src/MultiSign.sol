@@ -14,9 +14,9 @@ contract Multisig {
     /// @param _signers An array of addresses that are allowed to sign transfers
     /// @param _quorum The number of approvals required to execute a transfer
     constructor(address[] memory _signers, uint256 _quorum) {
-        require(_quorum <= _signers.length, SignersLengthCantBeLessThanQuorum());
-        require(_signers.length > 0, SignersLengthMustBeGreaterThanZero());
-        require(_quorum > 0, QuorumMustBeGreaterThanZero());
+        if (_quorum > _signers.length) revert SignersLengthCantBeLessThanQuorum();
+        if (_signers.length == 0) revert SignersLengthMustBeGreaterThanZero();
+        if (_quorum == 0) revert QuorumMustBeGreaterThanZero();
 
         quorum = _quorum;
 
@@ -189,5 +189,4 @@ contract Multisig {
     /// @notice Fallback function to receive Ether
     receive() external payable {
     }
-
 }
