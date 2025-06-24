@@ -26,7 +26,7 @@ contract ERC20MultiSign {
         token = IERC20(_tokenContract);
         quorum = _quorum;
 
-        for (uint256 i =  0; i < _signers.length; i++) {
+        for (uint256 i = 0; i < _signers.length; i++) {
             require(_signers[i] != address(0), SignerAddressCannotBeZero());
             isSigner[_signers[i]] = true;
         }
@@ -36,24 +36,24 @@ contract ERC20MultiSign {
     /// @param transferId The unique identifier for the transfer
     /// @param to The address to which the transfer is made
     /// @param amount The amount of the transfer
-    event TransferInitiated(uint256 transferId, address indexed to, uint256 amount, uint256 timestamp);
+    event TransferInitiated(uint256 indexed transferId, address indexed to, uint256 amount, uint256 timestamp);
 
     /// @notice Emitted when a transfer is approved by a signer
     /// @param transferId The unique identifier for the transfer
     /// @param signer The address of the signer who approved the transfer
-    event TransferApproved(uint256 transferId, address indexed signer, uint256 timestamp);
+    event TransferApproved(uint256 indexed transferId, address indexed signer, uint256 timestamp);
 
     /// @notice Emitted when a transfer is executed
     /// @param transferId The unique identifier for the transfer
     /// @param to The address to which the transfer is made
     /// @param amount The amount of the transfer
-    event TransferExecuted(uint256 transferId, address indexed to, uint256 amount, uint256 timestamp);
+    event TransferExecuted(uint256 indexed transferId, address indexed to, uint256 amount, uint256 timestamp);
 
     /// @notice Emitted when tokens are deposited into the contract
     /// @param from The address from which the tokens were deposited
     /// @param amount The amount of tokens deposited
     /// @param timestamp The timestamp of the deposit
-    event DepositReceived(address indexed from, uint256 amount, uint256 timestamp);
+    event DepositReceived(address indexed from, uint256 indexed amount, uint256 timestamp);
 
     /// @notice Reverts with an error if the number of signers is less than the quorum
     error SignersLengthCantBeLessThanQuorum();
@@ -69,8 +69,6 @@ contract ERC20MultiSign {
     error TransferAmountMustBeGreaterThanZero();
     /// @notice Reverts with an error if the signer address is zero
     error SignerAddressCannotBeZero();
-    /// @notice Reverts with an error if the transfer ID is zero
-    error TransferIdCannotBeZero();
     /// @notice Reverts with an error if the transfer has already been executed
     /// @param _transferId The ID of the transfer that has already been executed
     error TransferAlreadyExecuted(uint256 _transferId);
@@ -97,13 +95,13 @@ contract ERC20MultiSign {
     /// @param approvalCount The number of approvals received for the transfer
     /// @param executed A boolean indicating whether the transfer has been executed
     /// @param approvals A mapping of addresses to booleans indicating whether they have approved the transfer
-    struct Transfer{
+    struct Transfer {
         address to;
         uint256 amount;
         uint256 approvalCount;
         bool executed;
         mapping(address => bool) approvals;
-        }
+    }
 
     /// @notice A mapping from transfer ID to Transfer struct
     mapping(uint256 => Transfer) private transfers;
@@ -126,7 +124,7 @@ contract ERC20MultiSign {
 
     /// @notice Function makes a transfer from the contract to a specified address if the quorum is reached
     /// @param _transferId The ID of the transfer to be executed
-    function executeTransfer (uint256 _transferId) external onlySigner {
+    function executeTransfer(uint256 _transferId) external onlySigner {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.executed) revert TransferAlreadyExecuted(_transferId);
@@ -154,7 +152,7 @@ contract ERC20MultiSign {
         Transfer storage transfer = transfers[transferId];
         transfer.to = _to;
         transfer.amount = _amount;
-        transfer.approvalCount = 1;
+        transfer.approvalCount = transfer.approvalCount + 1;
         transfer.executed = false;
         transfer.approvals[msg.sender] = true;
 
@@ -164,8 +162,6 @@ contract ERC20MultiSign {
     /// @notice Function to approve a transfer by a signer
     /// @param _transferId The ID of the transfer to be approved
     function approveTransfer(uint256 _transferId) external onlySigner {
-        if (_transferId == 0) revert TransferIdCannotBeZero();
-
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.executed) revert TransferAlreadyExecuted(_transferId);
@@ -183,7 +179,11 @@ contract ERC20MultiSign {
     /// @return _amount The amount of the transfer
     /// @return _approvalCount The number of approvals received for the transfer
     /// @return _executed A boolean indicating whether the transfer has been executed
-    function getTransferInfo(uint256 _transferId) external view returns (address _to, uint256 _amount, uint256 _approvalCount, bool _executed) {
+    function getTransferInfo(uint256 _transferId)
+        external
+        view
+        returns (address _to, uint256 _amount, uint256 _approvalCount, bool _executed)
+    {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.amount == 0) revert InvalidTransferId();
@@ -195,7 +195,7 @@ contract ERC20MultiSign {
     /// @param _signer The address of the signer
     /// @param _transferId The ID of the transfer to check
     /// @return A boolean indicating whether the signer has approved the transfer
-    function signedStatus(address _signer, uint256 _transferId) external view returns(bool) {
+    function signedStatus(address _signer, uint256 _transferId) external view returns (bool) {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.amount == 0) revert InvalidTransferId();

@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 /// @title Multisignature Contract
 /// @author @rozgon7
 /// @notice This contract allows multiple signers to approve and execute transfers
-contract Multisig {
+contract MultiSign {
     /// @notice The number of signers required to execute a transfer
     uint256 public quorum;
     /// @notice The total number of transfers initiated
@@ -14,13 +14,13 @@ contract Multisig {
     /// @param _signers An array of addresses that are allowed to sign transfers
     /// @param _quorum The number of approvals required to execute a transfer
     constructor(address[] memory _signers, uint256 _quorum) {
-        if (_quorum > _signers.length) revert SignersLengthCantBeLessThanQuorum();
         if (_signers.length == 0) revert SignersLengthMustBeGreaterThanZero();
+        if (_quorum > _signers.length) revert SignersLengthCantBeLessThanQuorum();
         if (_quorum == 0) revert QuorumMustBeGreaterThanZero();
 
         quorum = _quorum;
 
-        for (uint256 i =  0; i < _signers.length; i++) {
+        for (uint256 i = 0; i < _signers.length; i++) {
             require(_signers[i] != address(0), SignerAddressCannotBeZero());
             isSigner[_signers[i]] = true;
         }
@@ -30,18 +30,18 @@ contract Multisig {
     /// @param transferId The unique identifier for the transfer
     /// @param to The address to which the transfer is made
     /// @param amount The amount of the transfer
-    event TransferInitiated(uint256 transferId, address indexed to, uint256 amount);
+    event TransferInitiated(uint256 indexed transferId, address indexed to, uint256 amount);
 
     /// @notice Emitted when a transfer is approved by a signer
     /// @param transferId The unique identifier for the transfer
     /// @param signer The address of the signer who approved the transfer
-    event TransferApproved(uint256 transferId, address indexed signer);
+    event TransferApproved(uint256 indexed transferId, address indexed signer);
 
     /// @notice Emitted when a transfer is executed
     /// @param transferId The unique identifier for the transfer
     /// @param to The address to which the transfer is made
     /// @param amount The amount of the transfer
-    event TransferExecuted(uint256 transferId, address indexed to, uint256 amount);
+    event TransferExecuted(uint256 indexed transferId, address indexed to, uint256 amount);
 
     /// @notice Reverts with an error if the number of signers is less than the quorum
     error SignersLengthCantBeLessThanQuorum();
@@ -57,8 +57,6 @@ contract Multisig {
     error TransferAmountMustBeGreaterThanZero();
     /// @notice Reverts with an error if the signer address is zero
     error SignerAddressCannotBeZero();
-    /// @notice Reverts with an error if the transfer ID is zero
-    error TransferIdCannotBeZero();
     /// @notice Reverts with an error if the transfer has already been executed
     /// @param _transferId The ID of the transfer that has already been executed
     error TransferAlreadyExecuted(uint256 _transferId);
@@ -76,6 +74,8 @@ contract Multisig {
     error InsufficientBalance(uint256 _currentBalance, uint256 _transferAmount);
     /// @notice Reverts with an error if the transaction fails
     error TransactionFailed();
+    /// @notice Reverts with an error if the contract balance is zero
+    error ContractBalanceIsZero();
 
     /// @dev The struct is used to store the details of a transfer
     /// @param to The address to which the transfer is made
@@ -83,13 +83,13 @@ contract Multisig {
     /// @param approvalCount The number of approvals received for the transfer
     /// @param executed A boolean indicating whether the transfer has been executed
     /// @param approvals A mapping of addresses to booleans indicating whether they have approved the transfer
-    struct Transfer{
+    struct Transfer {
         address to;
         uint256 amount;
         uint256 approvalCount;
         bool executed;
         mapping(address => bool) approvals;
-        }
+    }
 
     /// @notice A mapping from transfer ID to Transfer struct
     mapping(uint256 => Transfer) private transfers;
@@ -104,7 +104,7 @@ contract Multisig {
 
     /// @notice Function makes a transfer from the contract to a specified address if the quorum is reached
     /// @param _transferId The ID of the transfer to be executed
-    function executeTransfer (uint256 _transferId) external onlySigner {
+    function executeTransfer(uint256 _transferId) external onlySigner {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.executed) revert TransferAlreadyExecuted(_transferId);
@@ -112,7 +112,7 @@ contract Multisig {
         uint256 currentBalance = address(this).balance;
         if (currentBalance < transfer.amount) revert InsufficientBalance(currentBalance, transfer.amount);
 
-        (bool success, ) = (transfer.to).call{value : transfer.amount}("");
+        (bool success,) = (transfer.to).call{value: transfer.amount}("");
         require(success, TransactionFailed());
 
         transfer.executed = true;
@@ -127,12 +127,13 @@ contract Multisig {
     function initiateTransfer(address _to, uint256 _amount) external onlySigner returns (uint256 transferId) {
         if (_to == address(0)) revert TransferToCannotBeZeroAddress();
         if (_amount == 0) revert TransferAmountMustBeGreaterThanZero();
+        if ((address(this)).balance == 0) revert ContractBalanceIsZero();
 
         transferId = transfersCount++;
         Transfer storage transfer = transfers[transferId];
         transfer.to = _to;
         transfer.amount = _amount;
-        transfer.approvalCount = 1;
+        transfer.approvalCount = transfer.approvalCount + 1;
         transfer.executed = false;
         transfer.approvals[msg.sender] = true;
 
@@ -142,8 +143,6 @@ contract Multisig {
     /// @notice Function to approve a transfer by a signer
     /// @param _transferId The ID of the transfer to be approved
     function approveTransfer(uint256 _transferId) external onlySigner {
-        if (_transferId == 0) revert TransferIdCannotBeZero();
-
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.executed) revert TransferAlreadyExecuted(_transferId);
@@ -161,7 +160,11 @@ contract Multisig {
     /// @return _amount The amount of the transfer
     /// @return _approvalCount The number of approvals received for the transfer
     /// @return _executed A boolean indicating whether the transfer has been executed
-    function getTransferInfo(uint256 _transferId) external view returns (address _to, uint256 _amount, uint256 _approvalCount, bool _executed) {
+    function getTransferInfo(uint256 _transferId)
+        external
+        view
+        returns (address _to, uint256 _amount, uint256 _approvalCount, bool _executed)
+    {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.amount == 0) revert InvalidTransferId();
@@ -172,8 +175,8 @@ contract Multisig {
     /// @notice View function to check if a signer has approved a transfer
     /// @param _signer The address of the signer
     /// @param _transferId The ID of the transfer to check
-    /// @return A boolean indicating whether the signer has approved the transfer
-    function signedStatus(address _signer, uint256 _transferId) external view returns(bool) {
+    /// @return _signed A boolean indicating whether the signer has approved the transfer
+    function signedStatus(address _signer, uint256 _transferId) external view returns (bool _signed) {
         Transfer storage transfer = transfers[_transferId];
 
         if (transfer.amount == 0) revert InvalidTransferId();
@@ -187,6 +190,5 @@ contract Multisig {
     }
 
     /// @notice Fallback function to receive Ether
-    receive() external payable {
-    }
+    receive() external payable {}
 }
